@@ -34,7 +34,10 @@ class ServerInstance:
                 yield data
 
     def send(self, **kwargs):
-        self.conn.send(jsondict(**kwargs))#+b'\x1c')
+        try:
+            self.conn.send(jsondict(**kwargs))#+b'\x1c')
+        except Exception as e:
+            print('Connection crashed with', e)
 
     def handle_connection(self):
         while True:
@@ -52,7 +55,7 @@ class ServerInstance:
                     exec(msg['data'])
                     self.send(cmd='resp_complete')
                 elif msg['cmd'] == 'read_shared':
-                    self.send(cmd='response', data=self.shared_buffer.getvalue())
+                    self.send(cmd='response', data=self.shared_buffer.getvalue().decode())
                 elif msg['cmd'] == 'clear_shared':
                     self.shared_buffer.close()
                     self.shared_buffer = BytesIO()
@@ -61,7 +64,7 @@ class ServerInstance:
                     self.send(cmd='response', data=json.dumps(os.listdir(os.getcwd())))
                 elif msg['cmd'] == 'cwd':
                     self.send(cmd='response', data=os.getcwd())
-                elif msg['cmd'] == 'cpfile':
+                elif msg['cmd'] in ('cpfile', 'copy'):
                     fp = msg['data']
                     try:
                         self.send(cmd='file_start', file_size=os.path.getsize(fp))
@@ -148,13 +151,13 @@ class ClientInstance:
                 data = inp[sp+1:]
 
             if cmd == 'help':
-                print('Available server commands:\ncd, py, read_shared, clear_shared, ls, cwd, cpfile, exit, quit, close, ping\n\
+                print('Available server commands:\ncd, py, read_shared, clear_shared, ls, cwd, copy, exit, quit, close, ping\n\
 Available client commands:\nhelp, set_output_file, clientpy')
                 continue
             elif cmd == 'clientpy':
                 exec(data)
                 continue
-            elif cmd == 'set_output_file':
+            elif cmd in ('set_output_file', 'sof'):
                 self.output_file = data
                 if os.path.exists(self.output_file):
                     if input('This file already exists. Do you want to overwrite it? [y/n] : ')[0].lower() != 'y':
@@ -205,7 +208,7 @@ Available client commands:\nhelp, set_output_file, clientpy')
                         print('Transfer complete!')
 
 
-MODE = 1
+MODE = 0
 
 if MODE == 0:
     s = ServerInstance()
